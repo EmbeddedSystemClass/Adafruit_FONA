@@ -134,6 +134,19 @@ boolean Adafruit_FONA::begin(Stream &port) {
   return true;
 }
 
+/********* shutdown ********************************************/
+boolean Adafruit_FONA_3G::shutdown() {
+  if (!TCPclose()) {
+    return false;
+  }
+  if (!enableGPRS(false)) {
+    return false;
+  }
+  if (!sendCheckReply(F("AT+CPOF"), ok_reply, 1000)) {
+    return false;
+  }
+  return true;
+}
 
 /********* Serial port ********************************************/
 boolean Adafruit_FONA::setBaudrate(uint16_t baud) {
@@ -1260,19 +1273,61 @@ boolean Adafruit_FONA_3G::enableGPRS(boolean onoff) {
     }
 
     // connect in transparent
-    if (! sendCheckReply(F("AT+CIPMODE=1"), ok_reply, 10000))
+    if ( !sendCheckReply(F("AT+CIPMODE=0"), ok_reply, 10000))
       return false;
     // open network (?)
-    if (! sendCheckReply(F("AT+NETOPEN=,,1"), F("Network opened"), 10000))
+    DEBUG_PRINT(F("\t---> ")); DEBUG_PRINT(F("AT+NETOPEN"));
+    mySerial->println("AT+NETOPEN");
+    if ( !expectReply(ok_reply) ) {
+      // already opend?
+      char netOpened[32] = "\0";
+      parseReply(F("+IP ERROR: "), netOpened);
+      if (prog_char_strlen((prog_char*)netOpened) > 0) {
+        char temp[] = "Network is already opened";
+        if (strncmp_P(netOpened, (prog_char*)temp, prog_char_strlen((prog_char*)netOpened)) == 0) {
+          return true;
+        }
+      }
       return false;
+    }
+    if (!getReply(10000)) {
+      return false;
+    }
+    uint16_t netOpenResult = 100;
+    if (!Adafruit_FONA::parseReply(F("+NETOPEN: "), &netOpenResult)) {
+      return false;
+    }
+    if (netOpenResult != 0) {
+      Serial.printf("NETOPEN_ERR:%x\n", netOpenResult);
+      return false;
+    }
 
-    readline(); // eat 'OK'
   } else {
     // close GPRS context
-    if (! sendCheckReply(F("AT+NETCLOSE"), F("Network closed"), 10000))
+    uint16_t netCloseResult = 100;
+    DEBUG_PRINT(F("\t---> ")); DEBUG_PRINT(F("AT+NETCLOSE"));
+    mySerial->println("AT+NETCLOSE");
+    if ( !expectReply(ok_reply) ) {
+      // if already net closed, reply "+IP ERROR: Network is already closed"
+      char temp[32] = "\0";
+      if (!parseReply(F("+IP ERROR: "), temp)) {
+        return false;
+      }
+      if (prog_char_strlen((prog_char*)temp) == 0) {
+        return false;
+      }
+      return true;
+    }
+    if (!getReply(10000)) {
       return false;
-
-    readline(); // eat 'OK'
+    }
+    if (!parseReply(F("+NETCLOSE: "), &netCloseResult)) {
+      return false;
+    }
+    if (netCloseResult != 0) {
+      Serial.printf("NETCLOSE_ERR:%x\n", netCloseResult);
+      return false;
+    }
   }
 
   return true;
@@ -1344,51 +1399,113 @@ boolean Adafruit_FONA::TCPconnect(char *server, uint16_t port) {
   flushInput();
 
   // close all old connections
-  if (! sendCheckReply(F("AT+CIPSHUT"), F("SHUT OK"), 20000) ) return false;
+  uint16_t cipCloseNo = 100;
+  if (!Adafruit_FONA::TCPclose()) {
+    return false;
+  }
 
   // single connection at a time
-  if (! sendCheckReply(F("AT+CIPMUX=0"), ok_reply) ) return false;
+  // if (! sendCheckReply(F("AT+CIPMUX=0"), ok_reply) ) return false;
 
   // manually read data
   if (! sendCheckReply(F("AT+CIPRXGET=1"), ok_reply) ) return false;
 
-
-  DEBUG_PRINT(F("AT+CIPSTART=\"TCP\",\""));
+  DEBUG_PRINT(F("AT+CIPOPEN=0,\"TCP\",\""));
   DEBUG_PRINT(server);
-  DEBUG_PRINT(F("\",\""));
+  DEBUG_PRINT(F("\","));
   DEBUG_PRINT(port);
-  DEBUG_PRINTLN(F("\""));
 
-
-  mySerial->print(F("AT+CIPSTART=\"TCP\",\""));
+  flushInput();
+  mySerial->print(F("AT+CIPOPEN=0,\"TCP\",\""));
   mySerial->print(server);
-  mySerial->print(F("\",\""));
-  mySerial->print(port);
-  mySerial->println(F("\""));
+  mySerial->print(F("\","));
+  mySerial->println(port);
 
-  if (! expectReply(ok_reply)) return false;
-  if (! expectReply(F("CONNECT OK"))) return false;
+  // if you set CIPMODE to 1, never return OK.
+  // if (! expectReply("CONNECT 115200")) {
+  //   return false; 
+  // }
+  if (!expectReply(ok_reply)) {
+    return false;
+  }
+  if (!getReply(10000)) {
+    return false;
+  }
+  uint16_t cipOpenReply = 100;
+  if (!parseReply(F("+CIPOPEN: "), &cipOpenReply, ',', 1)) {
+    return false;
+  }
+  if (cipOpenReply != 0) {
+    return false;
+  }
 
-  // looks like it was a success (?)
   return true;
 }
 
 boolean Adafruit_FONA::TCPclose(void) {
-  return sendCheckReply(F("AT+CIPCLOSE"), ok_reply);
+  // return sendCheckReply(F("AT+CIPCLOSE=0"), ok_reply);
+
+  flushInput();
+  mySerial->println("AT+CIPCLOSE=0");
+  uint16_t cipCloseResult = 100;
+  if (!expectReply(ok_reply)) {
+    // If you cannot get "OK", ip already closed.
+    if (!parseReply(F("+CIPCLOSE: "), &cipCloseResult)) {
+      return false;
+    }
+    if (cipCloseResult != 0) {
+      Serial.printf("CIPCLOSE_ERR:%x", cipCloseResult);
+      return false;
+    }
+    return true;
+  }
+  readline(10000);
+  if (!parseReply(F("+CIPCLOSE: "), &cipCloseResult, ',', 1)) {
+    return false;
+  }
+  if (cipCloseResult != 0) {
+    Serial.printf("CIPCLOSE_ERR:%x", cipCloseResult);
+    return false;
+  }
+  return true;
+
 }
 
 boolean Adafruit_FONA::TCPconnected(void) {
-  if (! sendCheckReply(F("AT+CIPSTATUS"), ok_reply, 100) ) return false;
-  readline(100);
+  flushInput();
+  mySerial->println("AT+CIPOPEN?");
+  char reply[16] = "\0";
+  // while (!expectReply(ok_reply)) {
+  while (1 == 1) {
+    readline();
+    if(prog_char_strcmp(replybuffer, (prog_char*)F("OK")) == 0) {
+      break;
+    }
+    
+    uint16_t cipNo = 100;
+    if (!parseReply(F("+CIPOPEN: "), &cipNo) ) {
+      return false;
+    }
+    if (cipNo != 0) {
+      continue;
+    }
+    if (!parseReply(F("+CIPOPEN: "), reply, ',', 1) ) {
+      return false;
+    }
+  }
+  // readline(100);
 
-  DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
-
-  return (strcmp(replybuffer, "STATE: CONNECT OK") == 0);
+  // DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
+  if (strlen(reply) == 0) {
+    return false;
+  }
+  Serial.println("TCP Connected");
+  return (strncmp(reply, "\"TCP\"", strlen(reply) - 1) == 0);
 }
 
 boolean Adafruit_FONA::TCPsend(char *packet, uint8_t len) {
 
-  DEBUG_PRINT(F("AT+CIPSEND="));
+  DEBUG_PRINT(F("AT+CIPSEND=0,"));
   DEBUG_PRINTLN(len);
 #ifdef ADAFRUIT_FONA_DEBUG
   for (uint16_t i=0; i<len; i++) {
@@ -1398,44 +1515,67 @@ boolean Adafruit_FONA::TCPsend(char *packet, uint8_t len) {
 #endif
   DEBUG_PRINTLN();
 
-
-  mySerial->print(F("AT+CIPSEND="));
+  flushInput();
+  mySerial->print(F("AT+CIPSEND=0,"));
   mySerial->println(len);
-  readline();
 
-  DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
-
-  if (replybuffer[0] != '>') return false;
-
+  if (!getReply()) {
+    return false;
+  }
+  if (replybuffer[0] != '>') {
+    return false;
+  }
   mySerial->write(packet, len);
-  readline(3000); // wait up to 3 seconds to send the data
+  
+  if (!expectReply(ok_reply)) {
+    return false;
+  }
 
-  DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
+  // wait up to 10 seconds to send the data
+  if (!getReply(10000)) {
+    return false;
+  }
 
+  uint16_t reqLength = 0;
+  if (!parseReply(F("+CIPSEND: "), &reqLength, ',', 1)) {
+    return false;
+  }
+  uint16_t confLength = 0;
+  if (!parseReply(F("+CIPSEND: "), &confLength, ',', 2)) {
+    return false;
+  }
+  if (reqLength != len || confLength != len) {
+    Serial.println("Send Packet Error");
+    return false;
+  }
 
-  return (strcmp(replybuffer, "SEND OK") == 0);
+  return true;
 }
 
 uint16_t Adafruit_FONA::TCPavailable(void) {
+  flushInput();
   uint16_t avail;
 
-  if (! sendParseReply(F("AT+CIPRXGET=4"), F("+CIPRXGET: 4,"), &avail, ',', 0) ) return false;
+  if (! sendParseReply(F("AT+CIPRXGET=4,0"), F("+CIPRXGET: "), &avail, ',', 2) ) {
+    return false;
+  }
 
-
-  DEBUG_PRINT (avail); DEBUG_PRINTLN(F(" bytes available"));
-
-
+  DEBUG_PRINT (avail);
+  DEBUG_PRINTLN(F(" bytes available"));
   return avail;
 }
 
 
 uint16_t Adafruit_FONA::TCPread(uint8_t *buff, uint8_t len) {
+  flushInput();
   uint16_t avail;
 
-  mySerial->print(F("AT+CIPRXGET=2,"));
+  mySerial->print(F("AT+CIPRXGET=2,0,"));
   mySerial->println(len);
-  readline();
-  if (! parseReply(F("+CIPRXGET: 2,"), &avail, ',', 0)) return false;
+  if (!getReply(1000)) {
+    return false;
+  }
+  if (! parseReply(F("+CIPRXGET: "), &avail, ',', 2)) return false;
 
   readRaw(avail);
 
@@ -1789,6 +1929,13 @@ uint8_t Adafruit_FONA::readline(uint16_t timeout, boolean multiline) {
   return replyidx;
 }
 
+// this method is only call method readline().(use as readlline() for debug print)
+uint8_t Adafruit_FONA::getReply(uint16_t timeout) {
+  uint8_t l = readline(timeout);
+  DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
+  return l;
+}
+
 uint8_t Adafruit_FONA::getReply(char *send, uint16_t timeout) {
   flushInput();
 
@@ -2038,8 +2185,8 @@ boolean Adafruit_FONA::parseReplyQuoted(FONAFlashStringPtr toreply,
 
 boolean Adafruit_FONA::sendParseReply(FONAFlashStringPtr tosend,
 				      FONAFlashStringPtr toreply,
-				      uint16_t *v, char divider, uint8_t index) {
-  getReply(tosend);
+				      uint16_t *v, char divider, uint8_t index, uint16_t timeout) {
+  getReply(tosend, timeout);
 
   if (! parseReply(toreply, v, divider, index)) return false;
 
@@ -2048,10 +2195,53 @@ boolean Adafruit_FONA::sendParseReply(FONAFlashStringPtr tosend,
   return true;
 }
 
+boolean Adafruit_FONA::sendParseReply(FONAFlashStringPtr tosend,
+				      FONAFlashStringPtr toreply,
+				      char *c, char divider, uint8_t index, uint16_t timeout) {
+  getReply(tosend, timeout);
+
+  if (! parseReply(toreply, c, divider, index)) return false;
+
+  readline(); // eat 'OK'
+
+  return true;
+}
 
 // needed for CBC and others
 
-boolean Adafruit_FONA_3G::sendParseReply(FONAFlashStringPtr tosend,
+// boolean Adafruit_FONA_3G::sendParseReply(FONAFlashStringPtr tosend,
+// 				      FONAFlashStringPtr toreply,
+// 				      float *f, char divider, uint8_t index) {
+//   getReply(tosend);
+
+//   if (! parseReply(toreply, f, divider, index)) return false;
+
+//   readline(); // eat 'OK'
+
+//   return true;
+// }
+
+
+// boolean Adafruit_FONA_3G::parseReply(FONAFlashStringPtr toreply,
+//           float *f, char divider, uint8_t index) {
+//   char *p = prog_char_strstr(replybuffer, (prog_char*)toreply);  // get the pointer to the voltage
+//   if (p == 0) return false;
+//   p+=prog_char_strlen((prog_char*)toreply);
+//   //DEBUG_PRINTLN(p);
+//   for (uint8_t i=0; i<index;i++) {
+//     // increment dividers
+//     p = strchr(p, divider);
+//     if (!p) return false;
+//     p++;
+//     //DEBUG_PRINTLN(p);
+
+//   }
+//   *f = atof(p);
+
+//   return true;
+// }
+
+boolean Adafruit_FONA::sendParseReply(FONAFlashStringPtr tosend,
 				      FONAFlashStringPtr toreply,
 				      float *f, char divider, uint8_t index) {
   getReply(tosend);
@@ -2064,7 +2254,7 @@ boolean Adafruit_FONA_3G::sendParseReply(FONAFlashStringPtr tosend,
 }
 
 
-boolean Adafruit_FONA_3G::parseReply(FONAFlashStringPtr toreply,
+boolean Adafruit_FONA::parseReply(FONAFlashStringPtr toreply,
           float *f, char divider, uint8_t index) {
   char *p = prog_char_strstr(replybuffer, (prog_char*)toreply);  // get the pointer to the voltage
   if (p == 0) return false;

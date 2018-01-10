@@ -212,6 +212,7 @@ class Adafruit_FONA : public FONAStreamType {
   void flushInput();
   uint16_t readRaw(uint16_t b);
   uint8_t readline(uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS, boolean multiline = false);
+  uint8_t getReply(uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   uint8_t getReply(char *send, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   uint8_t getReply(FONAFlashStringPtr send, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   uint8_t getReply(FONAFlashStringPtr prefix, char *suffix, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
@@ -234,7 +235,16 @@ class Adafruit_FONA : public FONAStreamType {
 
   boolean sendParseReply(FONAFlashStringPtr tosend,
        FONAFlashStringPtr toreply,
-       uint16_t *v, char divider = ',', uint8_t index=0);
+       uint16_t *v, char divider = ',', uint8_t index=0, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
+  boolean sendParseReply(FONAFlashStringPtr tosend,
+       FONAFlashStringPtr toreply,
+       char *c, char divider = ',', uint8_t index=0, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
+  boolean parseReply(FONAFlashStringPtr toreply,
+        float *f, char divider, uint8_t index);
+
+  boolean sendParseReply(FONAFlashStringPtr tosend,
+                        FONAFlashStringPtr toreply,
+                        float *f, char divider = ',', uint8_t index=0);
 
   static boolean _incomingCall;
   static void onIncomingCall();
@@ -253,14 +263,15 @@ class Adafruit_FONA_3G : public Adafruit_FONA {
     boolean pickUp(void);
     boolean enableGPRS(boolean onoff);
     boolean enableGPS(boolean onoff);
+    boolean shutdown();
 
  protected:
-    boolean parseReply(FONAFlashStringPtr toreply,
-		       float *f, char divider, uint8_t index);
+//     boolean parseReply(FONAFlashStringPtr toreply,
+// 		       float *f, char divider, uint8_t index);
 
-    boolean sendParseReply(FONAFlashStringPtr tosend,
-			   FONAFlashStringPtr toreply,
-			   float *f, char divider = ',', uint8_t index=0);
+//     boolean sendParseReply(FONAFlashStringPtr tosend,
+// 			   FONAFlashStringPtr toreply,
+// 			   float *f, char divider = ',', uint8_t index=0);
 };
 
 #endif
