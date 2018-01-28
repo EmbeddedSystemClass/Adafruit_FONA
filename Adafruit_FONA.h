@@ -192,7 +192,9 @@ class Adafruit_FONA : public FONAStreamType {
   boolean sendCheckReply(char *send, char *reply, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   boolean sendCheckReply(FONAFlashStringPtr send, FONAFlashStringPtr reply, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   boolean sendCheckReply(char* send, FONAFlashStringPtr reply, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
-
+  
+  // shutdown
+  boolean shutdown(boolean force = false);
 
  protected:
   int8_t _rstpin;
@@ -263,8 +265,9 @@ class Adafruit_FONA_3G : public Adafruit_FONA {
     boolean pickUp(void);
     boolean enableGPRS(boolean onoff);
     boolean enableGPS(boolean onoff);
-    boolean shutdown();
-
+    uint8_t getGPS(char *buffer, uint8_t maxbuff);
+    boolean getGPS(float *lat, float *lon, float *speed_kph = NULL, float *heading = NULL, float *altitude = NULL);
+    boolean GPSstatus(void);
  protected:
 //     boolean parseReply(FONAFlashStringPtr toreply,
 // 		       float *f, char divider, uint8_t index);
