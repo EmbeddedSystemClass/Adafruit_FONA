@@ -42,14 +42,14 @@ boolean Adafruit_FONA::begin(Stream &port) {
   mySerial = &port;
 
   // check whether module is already running
-  if (mySerial->available()) {
-    flushInput();
-    if (sendCheckReply(F("AT"), ok_reply)) {
-      if (!shutdown()) {
-        shutdown(true);
-      }
-      delay(10000);
+  flushInput();
+  if (getReply(F("AT"), 50)) {
+    Serial.println("sim5320 already startted");
+    Serial.println("restart sim5320...");
+    if (!shutdown()) {
+      shutdown(true);
     }
+    delay(5000);
   }
 
   // High to Low time between 64 and 180 ms makes SIM5320 power on
@@ -1516,34 +1516,24 @@ boolean Adafruit_FONA::TCPclose(void) {
 
 boolean Adafruit_FONA::TCPconnected(void) {
   flushInput();
-  mySerial->println("AT+CIPOPEN?");
-  char reply[16] = "\0";
-  // while (!expectReply(ok_reply)) {
-  while (1 == 1) {
-    readline();
-    if(prog_char_strcmp(replybuffer, (prog_char*)F("OK")) == 0) {
-      break;
-    }
-    
-    uint16_t cipNo = 100;
-    if (!parseReply(F("+CIPOPEN: "), &cipNo) ) {
-      return false;
-    }
-    if (cipNo != 0) {
-      continue;
-    }
-    if (!parseReply(F("+CIPOPEN: "), reply, ',', 1) ) {
-      return false;
-    }
-  }
-  // readline(100);
-
-  // DEBUG_PRINT (F("\t<--- ")); DEBUG_PRINTLN(replybuffer);
-  if (strlen(reply) == 0) {
+  mySerial->println("AT+CIPCLOSE?");
+  if (!getReply(5000)) {
     return false;
   }
-  Serial.println("TCP Connected");
-  return (strncmp(reply, "\"TCP\"", strlen(reply) - 1) == 0);
+  uint16_t cip = 0;
+  if (!parseReply(F("+CIPCLOSE: "), &cip)) {
+    return false;
+  }
+  if (cip == 0) {
+    Serial.println("ip closed");
+    return false;
+  }
+  // eat ok
+  if (!expectReply(ok_reply)) {
+    return false;
+  }
+
+  return true;
 }
 
 boolean Adafruit_FONA::TCPsend(char *packet, uint8_t len) {
@@ -1875,6 +1865,7 @@ boolean Adafruit_FONA::HTTP_setup(char *url) {
 
   return true;
 }
+
 
 /********* HELPERS *********************************************/
 
