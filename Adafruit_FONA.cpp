@@ -18,7 +18,8 @@
 
 #include "Adafruit_FONA.h"
 
-
+#define COMP_MIN(a,b) ((a)<(b)?(a):(b))
+#define COMP_MAX(a,b) ((a)>(b)?(a):(b))
 
 
 Adafruit_FONA::Adafruit_FONA(int8_t rst)
@@ -43,13 +44,16 @@ boolean Adafruit_FONA::begin(Stream &port) {
 
   // check whether module is already running
   flushInput();
-  if (getReply(F("AT"), 50)) {
+  if (getReply(F("AT")) > 0) {
     Serial.println("sim5320 already startted");
     Serial.println("restart sim5320...");
     if (!shutdown()) {
+      Serial.println("shutdown failed...\nforce shutdown...");
       shutdown(true);
     }
-    delay(5000);
+    Serial.println("wait for restart...");
+    delay(3000);
+    flushInput();
   }
 
   // High to Low time between 64 and 180 ms makes SIM5320 power on
@@ -61,16 +65,20 @@ boolean Adafruit_FONA::begin(Stream &port) {
   digitalWrite(_rstpin, HIGH);
   delay(1000);
   
-  if (!expectReply(F("START"), 5000)) {
+  // START
+  if (!getReply(10000)) {
     return false;
   }
-  if (!expectReply(F("+CPIN: READY"), 5000)) {
+  // +CPIN: READY
+  if (!getReply(5000)) {
     return false;
   }
-  if (!expectReply(F("SMS DONE"), 5000)) {
+  // SMS DONE
+  if (!getReply(5000)) {
     return false;
   }
-  if (!expectReply(F("PB DONE"), 5000)) {
+  // PB DONE
+  if (!getReply(5000)) {
     return false;
   }
 
@@ -142,7 +150,7 @@ boolean Adafruit_FONA::shutdown(boolean force) {
   if (!enableGPS(false) && !force) {
     return false;
   }
-  if (!sendCheckReply(F("AT+CPOF"), ok_reply, 1000) && !force) {
+  if (!sendCheckReply(F("AT+CPOF"), ok_reply, 5000) && !force) {
     return false;
   }
   return true;
@@ -224,6 +232,15 @@ uint8_t Adafruit_FONA::getSIMCCID(char *ccid) {
   readline(); // eat 'OK'
 
   return strlen(ccid);
+}
+
+uint8_t Adafruit_FONA_3G::getSIMIMSI(char *imsi) {
+  getReply(F("AT+CIMI"));
+  strncpy(imsi, replybuffer, 15);
+  imsi[15] = '\0';
+  readline(); // eat 'OK'
+
+  return strlen(imsi);
 }
 
 /********* IMEI **********************************************************/
@@ -382,7 +399,7 @@ boolean Adafruit_FONA::setPWM(uint16_t period, uint8_t duty) {
 /********* CALL PHONES **************************************************/
 boolean Adafruit_FONA::callPhone(char *number) {
   char sendbuff[35] = "ATD";
-  strncpy(sendbuff+3, number, min(30, strlen(number)));
+  strncpy(sendbuff+3, number, COMP_MIN(30, 10));
   uint8_t x = strlen(sendbuff);
   sendbuff[x] = ';';
   sendbuff[x+1] = 0;
@@ -532,7 +549,7 @@ boolean Adafruit_FONA::readSMS(uint8_t i, char *smsbuff,
 
   flushInput();
 
-  uint16_t thelen = min(maxlen, strlen(replybuffer));
+  uint16_t thelen = COMP_MIN(maxlen, strlen(replybuffer));
   strncpy(smsbuff, replybuffer, thelen);
   smsbuff[thelen] = 0; // end the string
 
@@ -658,7 +675,7 @@ boolean Adafruit_FONA::sendUSSD(char *ussdmsg, char *ussdbuff, uint16_t maxlen, 
       // Find " to get end of ussd message.
       char *strend = strchr(p, '\"');
 
-      uint16_t lentocopy = min(maxlen-1, strend - p);
+      uint16_t lentocopy = COMP_MIN(maxlen-1, strend - p);
       strncpy(ussdbuff, p, lentocopy+1);
       ussdbuff[lentocopy] = 0;
       *readlen = lentocopy;
@@ -720,7 +737,7 @@ boolean Adafruit_FONA::getTime(char *buff, uint16_t maxlen) {
     return false;
 
   char *p = replybuffer+7;
-  uint16_t lentocopy = min(maxlen-1, strlen(p));
+  uint16_t lentocopy = COMP_MIN(maxlen-1, strlen(p));
   strncpy(buff, p, lentocopy+1);
   buff[lentocopy] = 0;
 
@@ -853,7 +870,7 @@ uint8_t Adafruit_FONA::getGPS(uint8_t arg, char *buffer, uint8_t maxbuff) {
 
   p+=6;
 
-  uint8_t len = max(maxbuff-1, strlen(p));
+  uint8_t len = COMP_MAX(maxbuff-1, strlen(p));
   strncpy(buffer, p, len);
   buffer[len] = 0;
 
@@ -874,7 +891,7 @@ uint8_t Adafruit_FONA_3G::getGPS(char *buffer, uint8_t maxbuff) {
   }
   p += strlen(info);
 
-  uint8_t len = max(maxbuff - 1, strlen(p));
+  uint8_t len = COMP_MAX(maxbuff - 1, strlen(p));
   strncpy(buffer, p, len);
   buffer[len] = 0;
 
@@ -1400,7 +1417,7 @@ boolean Adafruit_FONA::getGSMLoc(uint16_t *errorcode, char *buff, uint16_t maxle
     return false;
 
   char *p = replybuffer+14;
-  uint16_t lentocopy = min(maxlen-1, strlen(p));
+  uint16_t lentocopy = COMP_MIN(maxlen-1, strlen(p));
   strncpy(buff, p, lentocopy+1);
 
   readline(); // eat OK
@@ -1438,7 +1455,7 @@ boolean Adafruit_FONA::getGSMLoc(float *lat, float *lon) {
 /********* TCP FUNCTIONS  ************************************/
 
 
-boolean Adafruit_FONA::TCPconnect(char *server, uint16_t port) {
+boolean Adafruit_FONA::TCPconnect(const char *server, uint16_t port) {
   flushInput();
 
   // close all old connections
@@ -1536,8 +1553,10 @@ boolean Adafruit_FONA::TCPconnected(void) {
   return true;
 }
 
+/**
+ * パケットを送信する
+ **/
 boolean Adafruit_FONA::TCPsend(char *packet, uint8_t len) {
-
   DEBUG_PRINT(F("AT+CIPSEND=0,"));
   DEBUG_PRINTLN(len);
 #ifdef ADAFRUIT_FONA_DEBUG
@@ -1912,17 +1931,18 @@ void Adafruit_FONA::flushInput() {
     }
 }
 
-uint16_t Adafruit_FONA::readRaw(uint16_t b) {
+uint16_t Adafruit_FONA::readRaw(uint16_t b, char* buf) {
   uint16_t idx = 0;
 
-  while (b && (idx < sizeof(replybuffer)-1)) {
+  char* dist = !buf ? replybuffer : buf;
+  while (b && (idx < sizeof(dist)-1)) {
     if (mySerial->available()) {
-      replybuffer[idx] = mySerial->read();
+      dist[idx] = mySerial->read();
       idx++;
       b--;
     }
   }
-  replybuffer[idx] = 0;
+  dist[idx] = 0;
 
   return idx;
 }

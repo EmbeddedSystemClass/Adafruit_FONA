@@ -21,8 +21,6 @@
 #include "includes/FONAExtIncludes.h"
 #include "includes/platform/FONAPlatform.h"
 
-
-
 #define FONA800L 1
 #define FONA800H 6
 
@@ -146,7 +144,7 @@ class Adafruit_FONA : public FONAStreamType {
   boolean enableGPSNMEA(uint8_t nmea);
 
   // TCP raw connections
-  boolean TCPconnect(char *server, uint16_t port);
+  boolean TCPconnect(const char *server, uint16_t port);
   boolean TCPclose(void);
   boolean TCPconnected(void);
   boolean TCPsend(char *packet, uint8_t len);
@@ -212,7 +210,7 @@ class Adafruit_FONA : public FONAStreamType {
   boolean HTTP_setup(char *url);
 
   void flushInput();
-  uint16_t readRaw(uint16_t b);
+  uint16_t readRaw(uint16_t b, char* buf = nullptr);
   uint8_t readline(uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS, boolean multiline = false);
   uint8_t getReply(uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
   uint8_t getReply(char *send, uint16_t timeout = FONA_DEFAULT_TIMEOUT_MS);
@@ -266,6 +264,7 @@ class Adafruit_FONA_3G : public Adafruit_FONA {
     boolean enableGPRS(boolean onoff);
     boolean enableGPS(boolean onoff);
     uint8_t getGPS(char *buffer, uint8_t maxbuff);
+    uint8_t getSIMIMSI(char *imsi);
     boolean getGPS(float *lat, float *lon, float *speed_kph = NULL, float *heading = NULL, float *altitude = NULL);
     boolean GPSstatus(void);
  protected:
