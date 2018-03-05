@@ -903,7 +903,7 @@ uint8_t Adafruit_FONA_3G::getGPS(char *buffer, uint8_t maxbuff) {
   return len;
 }
 
-boolean Adafruit_FONA::getGPS(float *lat, float *lon, float *speed_kph, float *heading, float *altitude) {
+boolean Adafruit_FONA::getGPS(double *lat, double *lon, double *speed_kph, double *heading, double *altitude) {
 
   char gpsbuffer[120];
 
@@ -1008,26 +1008,26 @@ boolean Adafruit_FONA::getGPS(float *lat, float *lon, float *speed_kph, float *h
     double longitude = atof(longp);
 
     // convert latitude from minutes to decimal
-    float degrees = floor(latitude / 100);
-    double minutes = latitude - (100 * degrees);
+    double deg = floor(latitude / 100);
+    double minutes = latitude - (100 * deg);
     minutes /= 60;
-    degrees += minutes;
+    deg += minutes;
 
     // turn direction into + or -
-    if (latdir[0] == 'S') degrees *= -1;
+    if (latdir[0] == 'S') deg *= -1;
 
-    *lat = degrees;
+    *lat = deg;
 
     // convert longitude from minutes to decimal
-    degrees = floor(longitude / 100);
-    minutes = longitude - (100 * degrees);
+    deg = floor(longitude / 100);
+    minutes = longitude - (100 * deg);
     minutes /= 60;
-    degrees += minutes;
+    deg += minutes;
 
     // turn direction into + or -
-    if (longdir[0] == 'W') degrees *= -1;
+    if (longdir[0] == 'W') deg *= -1;
 
-    *lon = degrees;
+    *lon = deg;
 
     // only grab speed if needed
     if (speed_kph != NULL) {
@@ -1088,7 +1088,7 @@ boolean Adafruit_FONA::getGPS(float *lat, float *lon, float *speed_kph, float *h
   return true;
 }
 
-boolean Adafruit_FONA_3G::getGPS(float *lat, float *lon, float *speed_kph, float *heading, float *altitude) {
+boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, double *heading, double *altitude) {
   
   char gpsbuffer[120];
 
@@ -1159,26 +1159,26 @@ boolean Adafruit_FONA_3G::getGPS(float *lat, float *lon, float *speed_kph, float
   double latitude = atof(latp);
   double longitude = atof(longp);
   // convert latitude from minutes to decimal
-  float degrees = floor(latitude / 100);
-  double minutes = latitude - (100 * degrees);
+  double deg = floor(latitude / 100);
+  double minutes = latitude - (100 * deg);
   minutes /= 60;
-  degrees += minutes;
+  deg += minutes;
 
   // turn direction into + or -
-  if (latdir[0] == 'S') degrees *= -1;
+  if (latdir[0] == 'S') deg *= -1;
 
-  *lat = degrees;
+  *lat = deg;
 
   // convert longitude from minutes to decimal
-  degrees = floor(longitude / 100);
-  minutes = longitude - (100 * degrees);
+  deg = floor(longitude / 100);
+  minutes = longitude - (100 * deg);
   minutes /= 60;
-  degrees += minutes;
+  deg += minutes;
 
   // turn direction into + or -
-  if (longdir[0] == 'W') degrees *= -1;
+  if (longdir[0] == 'W') deg *= -1;
 
-  *lon = degrees;
+  *lon = deg;
 
   return true;
 }
