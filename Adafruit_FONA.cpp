@@ -139,6 +139,14 @@ boolean Adafruit_FONA::begin(Stream &port) {
   return true;
 }
 
+/**
+ * 起動済みかどうか
+ */
+bool Adafruit_FONA::isStart() {
+  flushInput();
+  return getReply(F("AT"), 50) > 0;
+}
+
 /********* shutdown ********************************************/
 boolean Adafruit_FONA::shutdown(boolean force) {
   if (!TCPclose() && !force) {

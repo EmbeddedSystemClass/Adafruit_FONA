@@ -69,6 +69,7 @@ class Adafruit_FONA : public FONAStreamType {
  public:
   Adafruit_FONA(int8_t r);
   boolean begin(FONAStreamType &port);
+  bool isStart();
   uint8_t type();
 
   // Stream
