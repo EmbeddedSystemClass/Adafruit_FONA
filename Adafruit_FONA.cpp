@@ -25,7 +25,8 @@
 Adafruit_FONA::Adafruit_FONA(int8_t rst)
 {
   _rstpin = rst;
-
+  pinMode(_rstpin, OUTPUT);
+  digitalWrite(_rstpin, HIGH);
   apn = F("FONAnet");
   apnusername = 0;
   apnpassword = 0;
@@ -44,7 +45,8 @@ boolean Adafruit_FONA::begin(Stream &port) {
 
   // check whether module is already running
   flushInput();
-  if (getReply(F("AT")) > 0) {
+  if (sendCheckReply(F("AT"), F("AT")) > 0) {
+    readline(); // eat OK
     Serial.println("sim5320 already startted");
     Serial.println("restart sim5320...");
     if (!shutdown()) {
@@ -53,17 +55,16 @@ boolean Adafruit_FONA::begin(Stream &port) {
     }
     Serial.println("wait for restart...");
     delay(3000);
+    yield();
     flushInput();
   }
-
   // High to Low time between 64 and 180 ms makes SIM5320 power on
-  pinMode(_rstpin, OUTPUT);
-  digitalWrite(_rstpin, HIGH);
-  delay(1000);
   digitalWrite(_rstpin, LOW);
   delay(120);
+  yield();
   digitalWrite(_rstpin, HIGH);
   delay(1000);
+  yield();
   
   // START
   if (!getReply(10000)) {
@@ -144,7 +145,7 @@ boolean Adafruit_FONA::begin(Stream &port) {
  */
 bool Adafruit_FONA::isStart() {
   flushInput();
-  return getReply(F("AT"), 50) > 0;
+  return sendCheckReply(F("AT"), ok_reply, 50);
 }
 
 /********* shutdown ********************************************/
@@ -1096,7 +1097,8 @@ boolean Adafruit_FONA::getGPS(double *lat, double *lon, double *speed_kph, doubl
   return true;
 }
 
-boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, double *heading, double *altitude) {
+boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, double *heading, double *altitude,
+                                  int* day, int* month, int* year, int* hour, int* minute, int* second) {
   
   char gpsbuffer[120];
 
@@ -1120,6 +1122,7 @@ boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, do
   // grab the latitude
   char *latp = strtok(gpsbuffer, ",");
   if (! latp) return false;
+  double latitude = atof(latp);
 
   // grab latitude direction
   char *latdir = strtok(NULL, ",");
@@ -1128,14 +1131,45 @@ boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, do
   // grab longitude
   char *longp = strtok(NULL, ",");
   if (! longp) return false;
+  double longitude = atof(longp);
 
   // grab longitude direction
   char *longdir = strtok(NULL, ",");
   if (! longdir) return false;
 
-  // skip date & time
-  tok = strtok(NULL, ",");
-  tok = strtok(NULL, ",");
+  // date
+  char* date = strtok(NULL, ",");
+  if (!date) return false;
+  char dateBuf[3] = "\0";
+  if (day != NULL) {
+    strncpy(dateBuf, date, 2);
+    *day = atoi(dateBuf);
+  }
+  if (month != NULL) {
+    strncpy(dateBuf, date + 2, 2);
+    *month = atoi(dateBuf);
+  }
+  if (year != NULL) {
+    strncpy(dateBuf, date + 4, 2);
+    *year = atoi(dateBuf);
+  }
+
+  // time
+  char* utcTime = strtok(NULL, ",");
+  if (!utcTime) return false;
+  char timeBuf[3] = "\0";
+  if (hour != NULL) {
+    strncpy(timeBuf, utcTime, 2);
+    *hour = atoi(timeBuf);
+  }
+  if (minute != NULL) {
+    strncpy(timeBuf, utcTime + 2, 2);
+    *minute = atoi(timeBuf);
+  }
+  if (second != NULL) {
+    strncpy(timeBuf, utcTime + 4, 2);
+    *second = atoi(timeBuf);
+  }
 
   // only grab altitude if needed
   if (altitude != NULL) {
@@ -1164,8 +1198,6 @@ boolean Adafruit_FONA_3G::getGPS(double *lat, double *lon, double *speed_kph, do
     *heading = atof(coursep);
   }
 
-  double latitude = atof(latp);
-  double longitude = atof(longp);
   // convert latitude from minutes to decimal
   double deg = floor(latitude / 100);
   double minutes = latitude - (100 * deg);

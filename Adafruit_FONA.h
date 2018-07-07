@@ -266,7 +266,8 @@ class Adafruit_FONA_3G : public Adafruit_FONA {
     boolean enableGPS(boolean onoff);
     uint8_t getGPS(char *buffer, uint8_t maxbuff);
     uint8_t getSIMIMSI(char *imsi);
-    boolean getGPS(double *lat, double *lon, double *speed_kph = NULL, double *heading = NULL, double *altitude = NULL);
+    boolean getGPS(double *lat, double *lon, double *speed_kph = NULL, double *heading = NULL, double *altitude = NULL,
+                        int* day = NULL, int* month = NULL, int* year = NULL, int* hour = NULL, int* minute = NULL, int* second = NULL);
     boolean GPSstatus(void);
  protected:
 //     boolean parseReply(FONAFlashStringPtr toreply,
