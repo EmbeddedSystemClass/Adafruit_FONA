@@ -30,6 +30,8 @@
 #define FONA3G_A 4
 #define FONA3G_E 5
 
+#define TASK_DELAY(delayMsec) vTaskDelay((delayMsec) / portTICK_RATE_MS)
+
 // Set the preferred SMS storage.
 //   Use "SM" for storage on the SIM.
 //   Use "ME" for internal storage on the FONA chip
@@ -148,9 +150,9 @@ class Adafruit_FONA : public FONAStreamType {
   boolean TCPconnect(const char *server, uint16_t port);
   boolean TCPclose(void);
   boolean TCPconnected(void);
-  boolean TCPsend(char *packet, uint8_t len);
+  boolean TCPsend(char *packet, uint16_t len);
   uint16_t TCPavailable(void);
-  uint16_t TCPread(uint8_t *buff, uint8_t len);
+  uint16_t TCPread(uint8_t *buff, uint16_t len);
 
   // HTTP low level interface (maps directly to SIM800 commands).
   boolean HTTP_init();

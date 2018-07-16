@@ -45,7 +45,7 @@ boolean Adafruit_FONA::begin(Stream &port) {
 
   // check whether module is already running
   flushInput();
-  if (sendCheckReply(F("AT"), F("AT")) > 0) {
+  if (sendCheckReply(F("AT"), F("OK")) > 0) {
     readline(); // eat OK
     Serial.println("sim5320 already startted");
     Serial.println("restart sim5320...");
@@ -54,17 +54,14 @@ boolean Adafruit_FONA::begin(Stream &port) {
       shutdown(true);
     }
     Serial.println("wait for restart...");
-    delay(3000);
-    yield();
+    TASK_DELAY(3000);
     flushInput();
   }
   // High to Low time between 64 and 180 ms makes SIM5320 power on
   digitalWrite(_rstpin, LOW);
-  delay(120);
-  yield();
+  TASK_DELAY(120);
   digitalWrite(_rstpin, HIGH);
-  delay(1000);
-  yield();
+  TASK_DELAY(1000);
   
   // START
   if (!getReply(10000)) {
@@ -85,7 +82,7 @@ boolean Adafruit_FONA::begin(Stream &port) {
 
   // turn off Echo!
   sendCheckReply(F("ATE0"), ok_reply);
-  delay(100);
+  TASK_DELAY(100);
 
   if (! sendCheckReply(F("ATE0"), ok_reply)) {
     return false;
@@ -94,7 +91,7 @@ boolean Adafruit_FONA::begin(Stream &port) {
   // turn on hangupitude
   sendCheckReply(F("AT+CVHU=0"), ok_reply);
 
-  delay(100);
+  TASK_DELAY(100);
   flushInput();
 
 
@@ -323,7 +320,7 @@ boolean Adafruit_FONA::playToolkitTone(uint8_t t, uint16_t len) {
 boolean Adafruit_FONA_3G::playToolkitTone(uint8_t t, uint16_t len) {
   if (! sendCheckReply(F("AT+CPTONE="), t, ok_reply))
     return false;
-  delay(len);
+  TASK_DELAY(len);
   return sendCheckReply(F("AT+CPTONE=0"), ok_reply);
 }
 
@@ -519,7 +516,7 @@ int8_t Adafruit_FONA::getNumSMS(void) {
   return -1;
 }
 
-// Reading SMS's is a bit involved so we don't use helpers that may cause delays or debug
+// Reading SMS's is a bit involved so we don't use helpers that may cause TASK_DELAYs or debug
 // printouts!
 boolean Adafruit_FONA::readSMS(uint8_t i, char *smsbuff,
 			       uint16_t maxlen, uint16_t *readlen) {
@@ -1596,7 +1593,7 @@ boolean Adafruit_FONA::TCPconnected(void) {
 /**
  * パケットを送信する
  **/
-boolean Adafruit_FONA::TCPsend(char *packet, uint8_t len) {
+boolean Adafruit_FONA::TCPsend(char *packet, uint16_t len) {
   DEBUG_PRINT(F("AT+CIPSEND=0,"));
   DEBUG_PRINTLN(len);
 #ifdef ADAFRUIT_FONA_DEBUG
@@ -1658,7 +1655,7 @@ uint16_t Adafruit_FONA::TCPavailable(void) {
 }
 
 
-uint16_t Adafruit_FONA::TCPread(uint8_t *buff, uint8_t len) {
+uint16_t Adafruit_FONA::TCPread(uint8_t *buff, uint16_t len) {
   flushInput();
   uint16_t avail;
 
@@ -1967,7 +1964,7 @@ void Adafruit_FONA::flushInput() {
             read();
             timeoutloop = 0;  // If char was received reset the timer
         }
-        delay(1);
+        TASK_DELAY(1);
     }
 }
 
@@ -2011,13 +2008,14 @@ uint8_t Adafruit_FONA::readline(uint16_t timeout, boolean multiline) {
       replybuffer[replyidx] = c;
       //DEBUG_PRINT(c, HEX); DEBUG_PRINT("#"); DEBUG_PRINTLN(c);
       replyidx++;
+      TASK_DELAY(1);
     }
 
     if (timeout == 0) {
       //DEBUG_PRINTLN(F("TIMEOUT"));
       break;
     }
-    delay(1);
+    TASK_DELAY(1);
   }
   replybuffer[replyidx] = 0;  // null term
   return replyidx;
